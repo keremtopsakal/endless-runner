@@ -47,6 +47,7 @@ workflows:
           xcode-project use-profiles
       - name: Build ipa for App Store distribution
         script: |
+          export BUILD_NUMBER=$(date +%s)
           xcode-project build-ipa \
             --project "EndlessRunner.xcodeproj" \
             --scheme "$XCODE_SCHEME"

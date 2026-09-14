@@ -252,55 +252,39 @@ final class GameViewController: UIViewController {
         }
     }
 
+    private static func loadCharacterModel() -> SCNNode {
+        guard
+            let url = Bundle.main.url(forResource: "character-oobi", withExtension: "obj", subdirectory: "Models"),
+            let modelScene = try? SCNScene(url: url, options: nil)
+        else {
+            let fallback = SCNCapsule(capRadius: 0.35, height: 1.1)
+            fallback.firstMaterial?.diffuse.contents = UIColor.systemBlue
+            let node = SCNNode(geometry: fallback)
+            node.position = SCNVector3(0, 0.55, 0)
+            return node
+        }
+
+        let container = SCNNode()
+        for child in modelScene.rootNode.childNodes {
+            container.addChildNode(child)
+        }
+        container.scale = SCNVector3(1.15, 1.15, 1.15)
+        return container
+    }
+
     private func makePlayerNode() -> SCNNode {
         let root = SCNNode()
         root.position = SCNVector3(0, restingY, 0)
 
-        let bodyCapsule = SCNCapsule(capRadius: 0.35, height: 1.1)
-        bodyCapsule.firstMaterial?.diffuse.contents = UIColor.systemBlue
-        let bodyNode = SCNNode(geometry: bodyCapsule)
-        bodyNode.position = SCNVector3(0, 0.05, 0)
-        root.addChildNode(bodyNode)
+        let characterNode = GameViewController.loadCharacterModel()
+        characterNode.position = SCNVector3(0, -restingY, 0)
+        root.addChildNode(characterNode)
 
-        let head = SCNSphere(radius: 0.28)
-        head.firstMaterial?.diffuse.contents = UIColor(red: 0.96, green: 0.8, blue: 0.65, alpha: 1)
-        let headNode = SCNNode(geometry: head)
-        headNode.position = SCNVector3(0, 0.75, 0)
-        root.addChildNode(headNode)
-
-        let skinColor = UIColor(red: 0.96, green: 0.8, blue: 0.65, alpha: 1)
-        let legColor = UIColor(red: 0.18, green: 0.22, blue: 0.5, alpha: 1)
-
-        let legGeo = SCNCapsule(capRadius: 0.11, height: 0.5)
-        legGeo.firstMaterial?.diffuse.contents = legColor
-        let leftLeg = SCNNode(geometry: legGeo)
-        leftLeg.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
-        leftLeg.position = SCNVector3(-0.16, -0.25, 0)
-        root.addChildNode(leftLeg)
-        let rightLeg = SCNNode(geometry: legGeo)
-        rightLeg.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
-        rightLeg.position = SCNVector3(0.16, -0.25, 0)
-        root.addChildNode(rightLeg)
-
-        let armGeo = SCNCapsule(capRadius: 0.08, height: 0.5)
-        armGeo.firstMaterial?.diffuse.contents = skinColor
-        let leftArm = SCNNode(geometry: armGeo)
-        leftArm.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
-        leftArm.position = SCNVector3(-0.48, 0.35, 0)
-        root.addChildNode(leftArm)
-        let rightArm = SCNNode(geometry: armGeo)
-        rightArm.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
-        rightArm.position = SCNVector3(0.48, 0.35, 0)
-        root.addChildNode(rightArm)
-
-        let swingAmount: CGFloat = 0.6
-        let swingDuration = 0.22
-        let swingForward = SCNAction.rotateTo(x: swingAmount, y: 0, z: 0, duration: swingDuration)
-        let swingBack = SCNAction.rotateTo(x: -swingAmount, y: 0, z: 0, duration: swingDuration)
-        leftLeg.runAction(.repeatForever(.sequence([swingForward, swingBack])))
-        rightArm.runAction(.repeatForever(.sequence([swingForward, swingBack])))
-        rightLeg.runAction(.repeatForever(.sequence([swingBack, swingForward])))
-        leftArm.runAction(.repeatForever(.sequence([swingBack, swingForward])))
+        let bob = SCNAction.sequence([
+            .moveBy(x: 0, y: 0.06, z: 0, duration: 0.15),
+            .moveBy(x: 0, y: -0.06, z: 0, duration: 0.15)
+        ])
+        characterNode.runAction(.repeatForever(bob))
 
         let bounding = SCNCapsule(capRadius: 0.4, height: 1.6)
         let body = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(geometry: bounding, options: nil))
@@ -327,12 +311,6 @@ final class GameViewController: UIViewController {
         dustNode.addParticleSystem(dust)
         root.addChildNode(dustNode)
         dustParticles = dust
-
-        let bob = SCNAction.sequence([
-            .moveBy(x: 0, y: 0.06, z: 0, duration: 0.15),
-            .moveBy(x: 0, y: -0.06, z: 0, duration: 0.15)
-        ])
-        bodyNode.runAction(.repeatForever(bob))
 
         return root
     }

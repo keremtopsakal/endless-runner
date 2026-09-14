@@ -72,6 +72,8 @@ final class GameViewController: UIViewController {
     private var obstacles: [SCNNode] = []
     private var coins: [SCNNode] = []
     private var scenery: [SCNNode] = []
+    private var dashes: [SCNNode] = []
+    private var distanceSinceDash: Float = 0
 
     private let impactLight = UIImpactFeedbackGenerator(style: .light)
     private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
@@ -153,8 +155,20 @@ final class GameViewController: UIViewController {
         let floor = SCNFloor()
         floor.reflectivity = 0
         floor.firstMaterial?.diffuse.contents = UIColor(red: 0.4, green: 0.7, blue: 0.35, alpha: 1)
+        floor.firstMaterial?.lightingModel = .physicallyBased
+        floor.firstMaterial?.roughness.contents = 1.0
         let floorNode = SCNNode(geometry: floor)
         scene.rootNode.addChildNode(floorNode)
+
+        let road = SCNBox(width: CGFloat(laneWidth) * 3 + 1.4, height: 0.02, length: 400, chamferRadius: 0)
+        road.firstMaterial?.diffuse.contents = UIColor(white: 0.27, alpha: 1)
+        road.firstMaterial?.lightingModel = .physicallyBased
+        road.firstMaterial?.roughness.contents = 0.9
+        let roadNode = SCNNode(geometry: road)
+        roadNode.position = SCNVector3(0, 0.011, -100)
+        scene.rootNode.addChildNode(roadNode)
+
+        addClouds()
 
         let ambient = SCNLight()
         ambient.type = .ambient
@@ -184,19 +198,34 @@ final class GameViewController: UIViewController {
         cameraNode.eulerAngles = SCNVector3(-0.4, 0, 0)
         scene.rootNode.addChildNode(cameraNode)
 
-        addLaneMarkers()
-
         playerNode = makePlayerNode()
         scene.rootNode.addChildNode(playerNode)
     }
 
-    private func addLaneMarkers() {
-        for offset: Float in [-laneWidth / 2, laneWidth / 2] {
-            let stripe = SCNBox(width: 0.04, height: 0.01, length: 300, chamferRadius: 0)
-            stripe.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.55)
-            let node = SCNNode(geometry: stripe)
-            node.position = SCNVector3(offset, 0.02, -100)
+    private func addClouds() {
+        for _ in 0..<6 {
+            let cloud = SCNSphere(radius: CGFloat.random(in: 2...4))
+            cloud.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.9)
+            cloud.firstMaterial?.lightingModel = .constant
+            let node = SCNNode(geometry: cloud)
+            node.scale = SCNVector3(1.8, 0.5, 1)
+            node.position = SCNVector3(
+                Float.random(in: -30...30),
+                Float.random(in: 12...20),
+                Float.random(in: -90 ... -40)
+            )
             scene.rootNode.addChildNode(node)
+        }
+    }
+
+    private func spawnDashes() {
+        for offset: Float in [-laneWidth / 2, laneWidth / 2] {
+            let dash = SCNBox(width: 0.04, height: 0.01, length: 1.2, chamferRadius: 0)
+            dash.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.6)
+            let node = SCNNode(geometry: dash)
+            node.position = SCNVector3(offset, 0.02, -85)
+            scene.rootNode.addChildNode(node)
+            dashes.append(node)
         }
     }
 
@@ -237,6 +266,40 @@ final class GameViewController: UIViewController {
         let headNode = SCNNode(geometry: head)
         headNode.position = SCNVector3(0, 0.75, 0)
         root.addChildNode(headNode)
+
+        let skinColor = UIColor(red: 0.96, green: 0.8, blue: 0.65, alpha: 1)
+        let legColor = UIColor(red: 0.18, green: 0.22, blue: 0.5, alpha: 1)
+
+        let legGeo = SCNCapsule(capRadius: 0.11, height: 0.5)
+        legGeo.firstMaterial?.diffuse.contents = legColor
+        let leftLeg = SCNNode(geometry: legGeo)
+        leftLeg.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
+        leftLeg.position = SCNVector3(-0.16, -0.25, 0)
+        root.addChildNode(leftLeg)
+        let rightLeg = SCNNode(geometry: legGeo)
+        rightLeg.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
+        rightLeg.position = SCNVector3(0.16, -0.25, 0)
+        root.addChildNode(rightLeg)
+
+        let armGeo = SCNCapsule(capRadius: 0.08, height: 0.5)
+        armGeo.firstMaterial?.diffuse.contents = skinColor
+        let leftArm = SCNNode(geometry: armGeo)
+        leftArm.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
+        leftArm.position = SCNVector3(-0.48, 0.35, 0)
+        root.addChildNode(leftArm)
+        let rightArm = SCNNode(geometry: armGeo)
+        rightArm.pivot = SCNMatrix4MakeTranslation(0, 0.25, 0)
+        rightArm.position = SCNVector3(0.48, 0.35, 0)
+        root.addChildNode(rightArm)
+
+        let swingAmount: CGFloat = 0.6
+        let swingDuration = 0.22
+        let swingForward = SCNAction.rotateTo(x: swingAmount, y: 0, z: 0, duration: swingDuration)
+        let swingBack = SCNAction.rotateTo(x: -swingAmount, y: 0, z: 0, duration: swingDuration)
+        leftLeg.runAction(.repeatForever(.sequence([swingForward, swingBack])))
+        rightArm.runAction(.repeatForever(.sequence([swingForward, swingBack])))
+        rightLeg.runAction(.repeatForever(.sequence([swingBack, swingForward])))
+        leftArm.runAction(.repeatForever(.sequence([swingBack, swingForward])))
 
         let bounding = SCNCapsule(capRadius: 0.4, height: 1.6)
         let body = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(geometry: bounding, options: nil))
@@ -369,6 +432,9 @@ final class GameViewController: UIViewController {
         coins.removeAll()
         scenery.forEach { $0.removeFromParentNode() }
         scenery.removeAll()
+        dashes.forEach { $0.removeFromParentNode() }
+        dashes.removeAll()
+        distanceSinceDash = 0
 
         currentLane = 0
         isJumping = false
@@ -480,14 +546,17 @@ final class GameViewController: UIViewController {
     }
 
     private func spawnCoin(lane: Int, z: Float) {
-        let sphere = SCNSphere(radius: 0.22)
-        sphere.firstMaterial?.diffuse.contents = UIColor.systemYellow
-        sphere.firstMaterial?.metalness.contents = 0.7
-        sphere.firstMaterial?.roughness.contents = 0.25
-        let node = SCNNode(geometry: sphere)
+        let disc = SCNCylinder(radius: 0.24, height: 0.06)
+        disc.firstMaterial?.diffuse.contents = UIColor.systemYellow
+        disc.firstMaterial?.lightingModel = .physicallyBased
+        disc.firstMaterial?.metalness.contents = 0.9
+        disc.firstMaterial?.roughness.contents = 0.15
+        let node = SCNNode(geometry: disc)
+        node.eulerAngles.x = .pi / 2
         node.position = SCNVector3(Float(lane) * laneWidth, 1.0, z)
 
-        let body = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(geometry: sphere, options: nil))
+        let collisionShape = SCNSphere(radius: 0.24)
+        let body = SCNPhysicsBody(type: .kinematic, shape: SCNPhysicsShape(geometry: collisionShape, options: nil))
         body.categoryBitMask = PhysicsCategory.coin
         body.contactTestBitMask = PhysicsCategory.player
         body.collisionBitMask = 0
@@ -561,6 +630,13 @@ extension GameViewController: SCNSceneRendererDelegate {
         advanceAndPrune(&obstacles, by: move, limit: 8)
         advanceAndPrune(&coins, by: move, limit: 8)
         advanceAndPrune(&scenery, by: move, limit: 8)
+        advanceAndPrune(&dashes, by: move, limit: 8)
+
+        distanceSinceDash += move
+        if distanceSinceDash >= 3 {
+            distanceSinceDash = 0
+            spawnDashes()
+        }
 
         distanceSinceObstacle += move
         if distanceSinceObstacle >= nextObstacleDistance {

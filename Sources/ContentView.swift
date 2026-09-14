@@ -1,24 +1,16 @@
-﻿import SwiftUI
-import SpriteKit
+import SwiftUI
 
-struct ContentView: View {
-    @State private var scene: GameScene?
-
-    var body: some View {
-        GeometryReader { proxy in
-            SpriteView(scene: currentScene(size: proxy.size))
-                .ignoresSafeArea()
-        }
+struct GameViewControllerRepresentable: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> GameViewController {
+        GameViewController()
     }
 
-    private func currentScene(size: CGSize) -> SKScene {
-        if let scene {
-            return scene
-        }
-        let newScene = GameScene()
-        newScene.size = size
-        newScene.scaleMode = .resizeFill
-        DispatchQueue.main.async { scene = newScene }
-        return newScene
+    func updateUIViewController(_ uiViewController: GameViewController, context: Context) {}
+}
+
+struct ContentView: View {
+    var body: some View {
+        GameViewControllerRepresentable()
+            .ignoresSafeArea()
     }
 }

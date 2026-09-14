@@ -16,7 +16,7 @@ targets:
       - path: Resources
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.endlessrunner
+        PRODUCT_BUNDLE_IDENTIFIER: com.keremtopsakal.endlessrunner
         PRODUCT_NAME: EndlessRunner
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_UILaunchScreen_Generation: YES

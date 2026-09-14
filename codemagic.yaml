@@ -8,7 +8,7 @@
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.example.endlessrunner
+        bundle_identifier: com.keremtopsakal.endlessrunner
       vars:
         XCODE_SCHEME: "EndlessRunner"
       xcode: latest

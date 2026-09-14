@@ -38,11 +38,17 @@ final class GameViewController: UIViewController {
     private let messagePanel = UIView()
     private let messageLabel = UILabel()
 
+    private let startPanel = UIView()
+    private let titleLabel = UILabel()
+    private let instructionsLabel = UILabel()
+    private let startBestLabel = UILabel()
+    private let playButton = UIButton(type: .system)
+
     private var scene: SCNScene!
     private var playerNode: SCNNode!
     private var dustParticles: SCNParticleSystem!
 
-    private let laneWidth: Float = 2.5
+    private let laneWidth: Float = 1.3
     private var currentLane = 0
 
     private let restingY: Float = 0.8
@@ -52,6 +58,7 @@ final class GameViewController: UIViewController {
     private var isPlaying = false
     private var isJumping = false
     private var isDucking = false
+    private var hasStartedOnce = false
 
     private var score = 0
     private var coinScore = 0
@@ -82,7 +89,8 @@ final class GameViewController: UIViewController {
         setupOverlay()
         setupGestures()
         bestLabel.text = "Best \(highScore)"
-        showMessage("Tap to Start")
+        startBestLabel.text = "Best score: \(highScore)"
+        startPanel.isHidden = false
         impactLight.prepare()
         impactMedium.prepare()
     }
@@ -109,6 +117,19 @@ final class GameViewController: UIViewController {
             height: 80
         )
         messageLabel.frame = messagePanel.bounds.insetBy(dx: 12, dy: 8)
+
+        let startWidth = min(320, view.bounds.width - 48)
+        let startHeight: CGFloat = 300
+        startPanel.frame = CGRect(
+            x: (view.bounds.width - startWidth) / 2,
+            y: (view.bounds.height - startHeight) / 2,
+            width: startWidth,
+            height: startHeight
+        )
+        titleLabel.frame = CGRect(x: 16, y: 20, width: startWidth - 32, height: 36)
+        instructionsLabel.frame = CGRect(x: 16, y: 64, width: startWidth - 32, height: 130)
+        startBestLabel.frame = CGRect(x: 16, y: 200, width: startWidth - 32, height: 20)
+        playButton.frame = CGRect(x: 24, y: 232, width: startWidth - 48, height: 52)
     }
 
     // MARK: - Setup
@@ -118,11 +139,12 @@ final class GameViewController: UIViewController {
         sceneView.scene = scene
         sceneView.delegate = self
         sceneView.isPlaying = true
-        let skyColor = UIColor(red: 0.53, green: 0.75, blue: 0.92, alpha: 1)
-        sceneView.backgroundColor = skyColor
-        scene.fogColor = skyColor
+        let horizonColor = UIColor(red: 0.68, green: 0.85, blue: 0.98, alpha: 1)
+        sceneView.backgroundColor = horizonColor
+        scene.background.contents = makeSkyGradientImage()
+        scene.fogColor = horizonColor
         scene.fogStartDistance = 45
-        scene.fogEndDistance = 82
+        scene.fogEndDistance = 90
         scene.fogDensityExponent = 1
         scene.physicsWorld.contactDelegate = self
         scene.physicsWorld.gravity = SCNVector3(0, 0, 0)
@@ -154,15 +176,50 @@ final class GameViewController: UIViewController {
 
         let camera = SCNCamera()
         camera.zFar = 110
+        camera.fieldOfView = 75
         camera.wantsHDR = false
         let cameraNode = SCNNode()
         cameraNode.camera = camera
-        cameraNode.position = SCNVector3(0, 3.4, 6.5)
-        cameraNode.eulerAngles = SCNVector3(-0.35, 0, 0)
+        cameraNode.position = SCNVector3(0, 4.5, 9.0)
+        cameraNode.eulerAngles = SCNVector3(-0.4, 0, 0)
         scene.rootNode.addChildNode(cameraNode)
+
+        addLaneMarkers()
 
         playerNode = makePlayerNode()
         scene.rootNode.addChildNode(playerNode)
+    }
+
+    private func addLaneMarkers() {
+        for offset: Float in [-laneWidth / 2, laneWidth / 2] {
+            let stripe = SCNBox(width: 0.04, height: 0.01, length: 300, chamferRadius: 0)
+            stripe.firstMaterial?.diffuse.contents = UIColor.white.withAlphaComponent(0.55)
+            let node = SCNNode(geometry: stripe)
+            node.position = SCNVector3(offset, 0.02, -100)
+            scene.rootNode.addChildNode(node)
+        }
+    }
+
+    private func makeSkyGradientImage() -> UIImage {
+        let size = CGSize(width: 4, height: 256)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            let colors = [
+                UIColor(red: 0.27, green: 0.52, blue: 0.83, alpha: 1).cgColor,
+                UIColor(red: 0.68, green: 0.85, blue: 0.98, alpha: 1).cgColor
+            ]
+            let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: colors as CFArray,
+                locations: [0, 1]
+            )!
+            ctx.cgContext.drawLinearGradient(
+                gradient,
+                start: CGPoint(x: 0, y: 0),
+                end: CGPoint(x: 0, y: size.height),
+                options: []
+            )
+        }
     }
 
     private func makePlayerNode() -> SCNNode {
@@ -242,6 +299,36 @@ final class GameViewController: UIViewController {
         messageLabel.textColor = .white
         messageLabel.numberOfLines = 2
         messagePanel.addSubview(messageLabel)
+
+        startPanel.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        startPanel.layer.cornerRadius = 22
+        view.addSubview(startPanel)
+
+        titleLabel.text = "Ceaseless Runner"
+        titleLabel.textAlignment = .center
+        titleLabel.font = .systemFont(ofSize: 26, weight: .bold)
+        titleLabel.textColor = .white
+        startPanel.addSubview(titleLabel)
+
+        instructionsLabel.text = "Swipe left or right to change lanes\nSwipe up to jump\nSwipe down to duck"
+        instructionsLabel.textAlignment = .center
+        instructionsLabel.font = .systemFont(ofSize: 16)
+        instructionsLabel.textColor = UIColor.white.withAlphaComponent(0.9)
+        instructionsLabel.numberOfLines = 3
+        startPanel.addSubview(instructionsLabel)
+
+        startBestLabel.textAlignment = .center
+        startBestLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        startBestLabel.textColor = UIColor.white.withAlphaComponent(0.75)
+        startPanel.addSubview(startBestLabel)
+
+        playButton.setTitle("PLAY", for: .normal)
+        playButton.titleLabel?.font = .boldSystemFont(ofSize: 20)
+        playButton.setTitleColor(.black, for: .normal)
+        playButton.backgroundColor = UIColor.systemYellow
+        playButton.layer.cornerRadius = 14
+        playButton.addTarget(self, action: #selector(handlePlayTapped), for: .touchUpInside)
+        startPanel.addSubview(playButton)
     }
 
     private func setupGestures() {
@@ -306,9 +393,14 @@ final class GameViewController: UIViewController {
     // MARK: - Input
 
     @objc private func handleTap() {
-        if !isPlaying {
-            startGame()
-        }
+        guard hasStartedOnce, !isPlaying else { return }
+        startGame()
+    }
+
+    @objc private func handlePlayTapped() {
+        hasStartedOnce = true
+        startPanel.isHidden = true
+        startGame()
     }
 
     @objc private func handleSwipeUp() {
@@ -368,7 +460,7 @@ final class GameViewController: UIViewController {
 
         let range = kind.yRange
         let height = range.max - range.min
-        let box = SCNBox(width: 1.6, height: height, length: 0.6, chamferRadius: 0.05)
+        let box = SCNBox(width: 1.0, height: height, length: 0.6, chamferRadius: 0.05)
         box.firstMaterial?.diffuse.contents = kind.color
         let node = SCNNode(geometry: box)
         node.position = SCNVector3(Float(lane) * laneWidth, Float(range.min) + Float(height) / 2, -80)
@@ -417,7 +509,7 @@ final class GameViewController: UIViewController {
                 alpha: 1
             )
             let node = SCNNode(geometry: building)
-            node.position = SCNVector3(side * 8, Float(height) / 2, -85)
+            node.position = SCNVector3(side * 4.2, Float(height) / 2, -85)
             node.castsShadow = false
             scene.rootNode.addChildNode(node)
             scenery.append(node)

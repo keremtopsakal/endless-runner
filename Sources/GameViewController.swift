@@ -59,6 +59,7 @@ final class GameViewController: UIViewController {
     private var isJumping = false
     private var isDucking = false
     private var hasStartedOnce = false
+    private var gameSessionID = 0
 
     private var score = 0
     private var coinScore = 0
@@ -415,6 +416,7 @@ final class GameViewController: UIViewController {
     // MARK: - Game flow
 
     private func startGame() {
+        gameSessionID += 1
         isPlaying = true
         score = 0
         coinScore = 0
@@ -602,14 +604,17 @@ final class GameViewController: UIViewController {
 
 extension GameViewController: SCNPhysicsContactDelegate {
     func physicsWorld(_ world: SCNPhysicsWorld, didBegin contact: SCNPhysicsContact) {
+        let session = gameSessionID
         let nodes = [contact.nodeA, contact.nodeB]
         if let coinNode = nodes.first(where: { $0.physicsBody?.categoryBitMask == PhysicsCategory.coin }) {
             DispatchQueue.main.async { [weak self] in
-                self?.collectCoin(coinNode)
+                guard let self, self.gameSessionID == session else { return }
+                self.collectCoin(coinNode)
             }
         } else if nodes.contains(where: { $0.physicsBody?.categoryBitMask == PhysicsCategory.obstacle }) {
             DispatchQueue.main.async { [weak self] in
-                self?.endGame()
+                guard let self, self.gameSessionID == session else { return }
+                self.endGame()
             }
         }
     }

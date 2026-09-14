@@ -1,0 +1,53 @@
+﻿workflows:
+  ios-testflight:
+    name: iOS TestFlight Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.example.endlessrunner
+      vars:
+        XCODE_SCHEME: "EndlessRunner"
+      xcode: latest
+    scripts:
+      - name: Generate placeholder app icon
+        script: |
+          python3 - <<'EOF'
+          import struct, zlib, pathlib
+
+          def write_png(path, width, height, rgb):
+              def chunk(tag, data):
+                  return (struct.pack('>I', len(data)) + tag + data +
+                          struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff))
+              sig = b'\x89PNG\r\n\x1a\n'
+              ihdr = struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)
+              row = bytes([0] + list(rgb) * width)
+              raw = row * height
+              idat = zlib.compress(raw, 9)
+              png = sig + chunk(b'IHDR', ihdr) + chunk(b'IDAT', idat) + chunk(b'IEND', b'')
+              pathlib.Path(path).write_bytes(png)
+
+          out = pathlib.Path("Resources/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png")
+          if not out.exists():
+              write_png(out, 1024, 1024, (79, 158, 219))
+          EOF
+      - name: Install XcodeGen
+        script: |
+          brew install xcodegen
+      - name: Generate Xcode project
+        script: |
+          xcodegen generate
+      - name: Build ipa for App Store distribution
+        script: |
+          xcode-project build-ipa \
+            --project "EndlessRunner.xcodeproj" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
